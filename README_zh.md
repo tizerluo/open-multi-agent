@@ -12,7 +12,7 @@
 
 - **多智能体团队** — 定义不同角色、工具甚至不同模型的智能体。它们通过消息总线和共享内存协作。
 - **任务 DAG 调度** — 任务之间存在依赖关系。框架进行拓扑排序——有依赖的任务等待，无依赖的任务并行执行。
-- **模型无关** — Claude 和 GPT 可以在同一个团队中使用。每个智能体可以单独配置模型。你也可以为任何 LLM 编写自己的适配器。
+- **模型无关** — Claude、GPT 和本地模型（Ollama、vLLM、LM Studio）可以在同一个团队中使用。通过 `baseURL` 即可接入任何 OpenAI 兼容服务。
 - **进程内执行** — 没有子进程开销。所有内容在一个 Node.js 进程中运行。可部署到 Serverless、Docker、CI/CD。
 
 ## 快速开始
@@ -40,6 +40,10 @@ const result = await orchestrator.runAgent(
 
 console.log(result.output)
 ```
+
+## 作者
+
+> JackChen — 前 WPS 产品经理，现独立创业者。关注小红书[「杰克西｜硅基杠杆」](https://www.xiaohongshu.com/user/profile/5a1bdc1e4eacab4aa39ea6d6)，持续获取我的 AI Agent 观点和思考。
 
 ## 多智能体团队
 
@@ -160,7 +164,7 @@ const result = await agent.run('Find the three most recent TypeScript releases.'
 </details>
 
 <details>
-<summary><b>多模型团队</b> — 在一个工作流中混合使用 Claude、GPT 和 Copilot</summary>
+<summary><b>多模型团队</b> — 在一个工作流中混合使用 Claude、GPT 和本地模型</summary>
 
 ```typescript
 const claudeAgent: AgentConfig = {
@@ -179,9 +183,20 @@ const gptAgent: AgentConfig = {
   tools: ['bash', 'file_read', 'file_write'],
 }
 
+// 任何 OpenAI 兼容 API — Ollama、vLLM、LM Studio 等
+const localAgent: AgentConfig = {
+  name: 'reviewer',
+  model: 'llama3.1',
+  provider: 'openai',
+  baseURL: 'http://localhost:11434/v1',
+  apiKey: 'ollama',
+  systemPrompt: 'You review code for correctness and clarity.',
+  tools: ['file_read', 'grep'],
+}
+
 const team = orchestrator.createTeam('mixed-team', {
   name: 'mixed-team',
-  agents: [claudeAgent, gptAgent],
+  agents: [claudeAgent, gptAgent, localAgent],
   sharedMemory: true,
 })
 
@@ -270,7 +285,7 @@ for await (const event of agent.stream('Explain monads in two sentences.')) {
 
 欢迎提 Issue、功能需求和 PR。以下方向的贡献尤其有价值：
 
-- **LLM 适配器** — Copilot 已原生支持。欢迎继续贡献 Ollama、llama.cpp、vLLM、Gemini 等适配器。`LLMAdapter` 接口只需实现两个方法：`chat()` 和 `stream()`。
+- **LLM 适配器** — Anthropic、OpenAI、Copilot 已原生支持。任何 OpenAI 兼容 API（Ollama、vLLM、LM Studio 等）可通过 `baseURL` 直接使用。欢迎贡献 Gemini 等其他适配器。`LLMAdapter` 接口只需实现两个方法：`chat()` 和 `stream()`。
 - **示例** — 真实场景的工作流和用例。
 - **文档** — 指南、教程和 API 文档。
 

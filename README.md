@@ -12,7 +12,7 @@ Build AI agent teams that work together. One agent plans, another implements, a 
 
 - **Multi-Agent Teams** — Define agents with different roles, tools, and even different models. They collaborate through a message bus and shared memory.
 - **Task DAG Scheduling** — Tasks have dependencies. The framework resolves them topologically — dependent tasks wait, independent tasks run in parallel.
-- **Model Agnostic** — Claude and GPT in the same team. Swap models per agent. Bring your own adapter for any LLM.
+- **Model Agnostic** — Claude, GPT, and local models (Ollama, vLLM, LM Studio) in the same team. Swap models per agent via `baseURL`.
 - **In-Process Execution** — No subprocess overhead. Everything runs in one Node.js process. Deploy to serverless, Docker, CI/CD.
 
 ## Quick Start
@@ -160,7 +160,7 @@ const result = await agent.run('Find the three most recent TypeScript releases.'
 </details>
 
 <details>
-<summary><b>Multi-Model Teams</b> — mix Claude, GPT, and Copilot in one workflow</summary>
+<summary><b>Multi-Model Teams</b> — mix Claude, GPT, and local models in one workflow</summary>
 
 ```typescript
 const claudeAgent: AgentConfig = {
@@ -179,9 +179,20 @@ const gptAgent: AgentConfig = {
   tools: ['bash', 'file_read', 'file_write'],
 }
 
+// Any OpenAI-compatible API — Ollama, vLLM, LM Studio, etc.
+const localAgent: AgentConfig = {
+  name: 'reviewer',
+  model: 'llama3.1',
+  provider: 'openai',
+  baseURL: 'http://localhost:11434/v1',
+  apiKey: 'ollama',
+  systemPrompt: 'You review code for correctness and clarity.',
+  tools: ['file_read', 'grep'],
+}
+
 const team = orchestrator.createTeam('mixed-team', {
   name: 'mixed-team',
-  agents: [claudeAgent, gptAgent],
+  agents: [claudeAgent, gptAgent, localAgent],
   sharedMemory: true,
 })
 
@@ -270,7 +281,7 @@ for await (const event of agent.stream('Explain monads in two sentences.')) {
 
 Issues, feature requests, and PRs are welcome. Some areas where contributions would be especially valuable:
 
-- **LLM Adapters** — Copilot is now supported out of the box. Additional adapters for Ollama, llama.cpp, vLLM, and Gemini are welcome. The `LLMAdapter` interface requires just two methods: `chat()` and `stream()`.
+- **LLM Adapters** — Anthropic, OpenAI, and Copilot are supported out of the box. Any OpenAI-compatible API (Ollama, vLLM, LM Studio, etc.) works via `baseURL`. Additional adapters for Gemini and other providers are welcome. The `LLMAdapter` interface requires just two methods: `chat()` and `stream()`.
 - **Examples** — Real-world workflows and use cases.
 - **Documentation** — Guides, tutorials, and API docs.
 
