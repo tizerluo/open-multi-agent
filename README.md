@@ -21,7 +21,7 @@ Build AI agent teams that work together. One agent plans, another implements, a 
 npm install @jackchen_me/open-multi-agent
 ```
 
-Set `ANTHROPIC_API_KEY` (and optionally `OPENAI_API_KEY`) in your environment.
+Set `ANTHROPIC_API_KEY` (and optionally `OPENAI_API_KEY` or `GITHUB_TOKEN` for Copilot) in your environment.
 
 ```typescript
 import { OpenMultiAgent } from '@jackchen_me/open-multi-agent'
@@ -160,7 +160,7 @@ const result = await agent.run('Find the three most recent TypeScript releases.'
 </details>
 
 <details>
-<summary><b>Multi-Model Teams</b> — mix Claude and GPT in one workflow</summary>
+<summary><b>Multi-Model Teams</b> — mix Claude, GPT, and Copilot in one workflow</summary>
 
 ```typescript
 const claudeAgent: AgentConfig = {
@@ -246,6 +246,7 @@ for await (const event of agent.stream('Explain monads in two sentences.')) {
 │  - prompt()       │───►│  LLMAdapter          │
 │  - stream()       │    │  - AnthropicAdapter  │
 └────────┬──────────┘    │  - OpenAIAdapter     │
+         │               │  - CopilotAdapter    │
          │               └──────────────────────┘
 ┌────────▼──────────┐
 │  AgentRunner      │    ┌──────────────────────┐
@@ -269,13 +270,19 @@ for await (const event of agent.stream('Explain monads in two sentences.')) {
 
 Issues, feature requests, and PRs are welcome. Some areas where contributions would be especially valuable:
 
-- **LLM Adapters** — Ollama, llama.cpp, vLLM, Gemini. The `LLMAdapter` interface requires just two methods: `chat()` and `stream()`.
+- **LLM Adapters** — Copilot is now supported out of the box. Additional adapters for Ollama, llama.cpp, vLLM, and Gemini are welcome. The `LLMAdapter` interface requires just two methods: `chat()` and `stream()`.
 - **Examples** — Real-world workflows and use cases.
 - **Documentation** — Guides, tutorials, and API docs.
 
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=JackChen-me/open-multi-agent&type=Date&v=20260402)](https://star-history.com/#JackChen-me/open-multi-agent&Date)
+
+## Contributors
+
+<a href="https://github.com/JackChen-me/open-multi-agent/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=JackChen-me/open-multi-agent" />
+</a>
 
 ## License
 

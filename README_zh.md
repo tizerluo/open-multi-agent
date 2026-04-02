@@ -21,7 +21,7 @@
 npm install @jackchen_me/open-multi-agent
 ```
 
-在环境变量中设置 `ANTHROPIC_API_KEY`（以及可选的 `OPENAI_API_KEY`）。
+在环境变量中设置 `ANTHROPIC_API_KEY`（以及可选的 `OPENAI_API_KEY` 或用于 Copilot 的 `GITHUB_TOKEN`）。
 
 ```typescript
 import { OpenMultiAgent } from '@jackchen_me/open-multi-agent'
@@ -160,7 +160,7 @@ const result = await agent.run('Find the three most recent TypeScript releases.'
 </details>
 
 <details>
-<summary><b>多模型团队</b> — 在一个工作流中混合使用 Claude 和 GPT</summary>
+<summary><b>多模型团队</b> — 在一个工作流中混合使用 Claude、GPT 和 Copilot</summary>
 
 ```typescript
 const claudeAgent: AgentConfig = {
@@ -246,6 +246,7 @@ for await (const event of agent.stream('Explain monads in two sentences.')) {
 │  - prompt()       │───►│  LLMAdapter          │
 │  - stream()       │    │  - AnthropicAdapter  │
 └────────┬──────────┘    │  - OpenAIAdapter     │
+         │               │  - CopilotAdapter    │
          │               └──────────────────────┘
 ┌────────▼──────────┐
 │  AgentRunner      │    ┌──────────────────────┐
@@ -269,13 +270,19 @@ for await (const event of agent.stream('Explain monads in two sentences.')) {
 
 欢迎提 Issue、功能需求和 PR。以下方向的贡献尤其有价值：
 
-- **LLM 适配器** — Ollama、llama.cpp、vLLM、Gemini。`LLMAdapter` 接口只需实现两个方法：`chat()` 和 `stream()`。
+- **LLM 适配器** — Copilot 已原生支持。欢迎继续贡献 Ollama、llama.cpp、vLLM、Gemini 等适配器。`LLMAdapter` 接口只需实现两个方法：`chat()` 和 `stream()`。
 - **示例** — 真实场景的工作流和用例。
 - **文档** — 指南、教程和 API 文档。
 
 ## Star 趋势
 
 [![Star History Chart](https://api.star-history.com/svg?repos=JackChen-me/open-multi-agent&type=Date&v=20260402)](https://star-history.com/#JackChen-me/open-multi-agent&Date)
+
+## 贡献者
+
+<a href="https://github.com/JackChen-me/open-multi-agent/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=JackChen-me/open-multi-agent" />
+</a>
 
 ## 许可证
 
