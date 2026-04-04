@@ -27,6 +27,7 @@ import type {
   AgentConfig,
   AgentState,
   AgentRunResult,
+  BeforeRunHookContext,
   LLMMessage,
   StreamEvent,
   TokenUsage,
@@ -278,6 +279,13 @@ export class Agent {
     const agentStartMs = Date.now()
 
     try {
+      // --- beforeRun hook ---
+      if (this.config.beforeRun) {
+        const hookCtx = this.buildBeforeRunHookContext(messages)
+        const modified = await this.config.beforeRun(hookCtx)
+        this.applyHookContext(messages, modified, hookCtx.prompt)
+      }
+
       const runner = await this.getRunner()
       const internalOnMessage = (msg: LLMMessage) => {
         this.state.messages.push(msg)
@@ -296,18 +304,28 @@ export class Agent {
 
       // --- Structured output validation ---
       if (this.config.outputSchema) {
-        const validated = await this.validateStructuredOutput(
+        let validated = await this.validateStructuredOutput(
           messages,
           result,
           runner,
           runOptions,
         )
+        // --- afterRun hook ---
+        if (this.config.afterRun) {
+          validated = await this.config.afterRun(validated)
+        }
         this.emitAgentTrace(callerOptions, agentStartMs, validated)
         return validated
       }
 
+      let agentResult = this.toAgentRunResult(result, true)
+
+      // --- afterRun hook ---
+      if (this.config.afterRun) {
+        agentResult = await this.config.afterRun(agentResult)
+      }
+
       this.transitionTo('completed')
-      const agentResult = this.toAgentRunResult(result, true)
       this.emitAgentTrace(callerOptions, agentStartMs, agentResult)
       return agentResult
     } catch (err) {
@@ -440,13 +458,27 @@ export class Agent {
     this.transitionTo('running')
 
     try {
+      // --- beforeRun hook ---
+      if (this.config.beforeRun) {
+        const hookCtx = this.buildBeforeRunHookContext(messages)
+        const modified = await this.config.beforeRun(hookCtx)
+        this.applyHookContext(messages, modified, hookCtx.prompt)
+      }
+
       const runner = await this.getRunner()
 
       for await (const event of runner.stream(messages)) {
         if (event.type === 'done') {
           const result = event.data as import('./runner.js').RunResult
           this.state.tokenUsage = addUsage(this.state.tokenUsage, result.tokenUsage)
+
+          let agentResult = this.toAgentRunResult(result, true)
+          if (this.config.afterRun) {
+            agentResult = await this.config.afterRun(agentResult)
+          }
           this.transitionTo('completed')
+          yield { type: 'done', data: agentResult } satisfies StreamEvent
+          continue
         } else if (event.type === 'error') {
           const error = event.data instanceof Error
             ? event.data
@@ -460,6 +492,50 @@ export class Agent {
       const error = err instanceof Error ? err : new Error(String(err))
       this.transitionToError(error)
       yield { type: 'error', data: error } satisfies StreamEvent
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Hook helpers
+  // -------------------------------------------------------------------------
+
+  /** Extract the prompt text from the last user message to build hook context. */
+  private buildBeforeRunHookContext(messages: LLMMessage[]): BeforeRunHookContext {
+    let prompt = ''
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]!.role === 'user') {
+        prompt = messages[i]!.content
+          .filter((b): b is import('../types.js').TextBlock => b.type === 'text')
+          .map(b => b.text)
+          .join('')
+        break
+      }
+    }
+    // Strip hook functions to avoid circular self-references in the context
+    const { beforeRun, afterRun, ...agentInfo } = this.config
+    return { prompt, agent: agentInfo as AgentConfig }
+  }
+
+  /**
+   * Apply a (possibly modified) hook context back to the messages array.
+   *
+   * Only text blocks in the last user message are replaced; non-text content
+   * (images, tool results) is preserved. The array element is replaced (not
+   * mutated in place) so that shallow copies of the original array (e.g. from
+   * `prompt()`) are not affected.
+   */
+  private applyHookContext(messages: LLMMessage[], ctx: BeforeRunHookContext, originalPrompt: string): void {
+    if (ctx.prompt === originalPrompt) return
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]!.role === 'user') {
+        const nonTextBlocks = messages[i]!.content.filter(b => b.type !== 'text')
+        messages[i] = {
+          role: 'user',
+          content: [{ type: 'text', text: ctx.prompt }, ...nonTextBlocks],
+        }
+        break
+      }
     }
   }
 
