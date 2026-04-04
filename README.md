@@ -15,7 +15,7 @@ TypeScript framework for multi-agent orchestration. One `runTeam()` call from go
 - **Goal In, Result Out** — `runTeam(team, "Build a REST API")`. A coordinator agent auto-decomposes the goal into a task DAG with dependencies and assignees, runs independent tasks in parallel, and synthesizes the final output. No manual task definitions or graph wiring required.
 - **TypeScript-Native** — Built for the Node.js ecosystem. `npm install`, import, run. No Python runtime, no subprocess bridge, no sidecar services. Embed in Express, Next.js, serverless functions, or CI/CD pipelines.
 - **Auditable and Lightweight** — 3 runtime dependencies (`@anthropic-ai/sdk`, `openai`, `zod`). 27 source files. The entire codebase is readable in an afternoon.
-- **Model Agnostic** — Claude, GPT, Gemma 4, and local models (Ollama, vLLM, LM Studio) in the same team. Swap models per agent via `baseURL`.
+- **Model Agnostic** — Claude, GPT, Gemma 4, and local models (Ollama, vLLM, LM Studio, llama.cpp server) in the same team. Swap models per agent via `baseURL`.
 - **Multi-Agent Collaboration** — Agents with different roles, tools, and models collaborate through a message bus and shared memory.
 - **Structured Output** — Add `outputSchema` (Zod) to any agent. Output is parsed as JSON, validated, and auto-retried once on failure. Access typed results via `result.structured`.
 - **Task Retry** — Set `maxRetries` on tasks for automatic retry with exponential backoff. Failed attempts accumulate token usage for accurate billing.
@@ -184,6 +184,7 @@ npx tsx examples/01-single-agent.ts
 | Grok (xAI)   | `provider: 'grok'` | `XAI_API_KEY` | Verified |
 | GitHub Copilot | `provider: 'copilot'` | `GITHUB_TOKEN` | Verified |
 | Ollama / vLLM / LM Studio | `provider: 'openai'` + `baseURL` | — | Verified |
+| llama.cpp server | `provider: 'openai'` + `baseURL` | — | Verified |
 
 Verified local models with tool-calling: **Gemma 4** (see [example 08](examples/08-gemma4-local.ts)).
 
