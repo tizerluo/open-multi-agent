@@ -490,6 +490,8 @@ export class AgentRunner {
     for await (const event of this.stream(messages, options)) {
       if (event.type === 'done') {
         Object.assign(accumulated, event.data)
+      } else if (event.type === 'error') {
+        throw event.data
       }
     }
 
