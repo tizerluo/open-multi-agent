@@ -29,7 +29,9 @@ export function registerAgentCommand(program: Command): void {
       const config = loadConfig(opts.config)
       const provider = (opts.provider ?? config.provider) as SupportedProvider
       const model = opts.model ?? config.model
-      const baseURL = config.baseURL
+      // Only carry baseURL from config when the provider hasn't been overridden;
+      // otherwise a saved DeepSeek baseURL would be sent to Grok/Anthropic etc.
+      const baseURL = opts.provider == null ? config.baseURL : undefined
 
       // Temporarily override provider for key lookup
       const apiKey = assertApiKey({ ...config, provider })
@@ -37,6 +39,14 @@ export function registerAgentCommand(program: Command): void {
       const tools = opts.tools
         ? opts.tools.split(',').map(t => t.trim())
         : ['bash', 'file_read', 'file_write']
+
+      const maxTurns = parseInt(opts.maxTurns ?? '10', 10)
+      if (isNaN(maxTurns) || maxTurns < 1) {
+        exitWithError(
+          `Invalid --max-turns value "${opts.maxTurns}".`,
+          'Provide a positive integer, e.g. --max-turns 10',
+        )
+      }
 
       const agentConfig: AgentConfig = {
         name: 'oma-agent',
@@ -46,7 +56,7 @@ export function registerAgentCommand(program: Command): void {
         baseURL,
         systemPrompt: opts.system ?? 'You are a helpful assistant.',
         tools,
-        maxTurns: parseInt(opts.maxTurns ?? '10', 10),
+        maxTurns,
       }
 
       const renderer = createProgressRenderer()
