@@ -2,8 +2,12 @@
   "name": "@jackchen_me/open-multi-agent",
   "version": "1.0.1",
   "description": "TypeScript multi-agent framework — one runTeam() call from goal to result. Auto task decomposition, parallel execution. 3 dependencies, deploys anywhere Node.js runs.",
+  "bin": {
+    "oma": "./dist-cli/cli/bin/oma.js"
+  },
   "files": [
     "dist",
+    "dist-cli",
     "README.md",
     "LICENSE"
   ],
@@ -18,12 +22,14 @@
   },
   "scripts": {
     "build": "tsc",
+    "build:cli": "tsc -p cli/tsconfig.cli.json",
+    "build:all": "npm run build && npm run build:cli",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "test:e2e": "RUN_E2E=1 vitest run tests/e2e/",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build:all"
   },
   "keywords": [
     "ai",
@@ -44,7 +50,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
+    "chalk": "^5.6.2",
+    "commander": "^13.1.0",
+    "inquirer": "^12.11.1",
     "openai": "^4.73.0",
+    "ora": "^8.2.0",
     "zod": "^3.23.0"
   },
   "peerDependencies": {
