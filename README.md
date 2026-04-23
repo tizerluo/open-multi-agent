@@ -38,7 +38,36 @@ Set the API key for your provider. Local models via Ollama require no API key �
 - `ANTHROPIC_API_KEY`
 - `OPENAI_API_KEY`
 - `GEMINI_API_KEY`
+- `XAI_API_KEY` (for Grok)
 - `GITHUB_TOKEN` (for Copilot)
+
+### Option A — CLI (no code required)
+
+After installing, an `oma` command is available. Run interactive setup first:
+
+```bash
+oma init
+```
+
+This creates `~/.oma/config.json` with your provider, model, API key, and default agents. Then:
+
+```bash
+# Single agent — quick one-off tasks
+oma agent "Write a Python function that reverses a string and explain it"
+
+# Full team — describe a goal, the framework plans and runs it
+oma run "Build a command-line todo app in TypeScript and save it to /tmp/todo/"
+
+# Override model or provider on the fly
+oma agent "Summarise this for me" --provider openai --model deepseek-chat
+
+# Check your current config
+oma config show
+```
+
+Progress is shown in real time with spinners per agent, task status, and a token summary at the end.
+
+### Option B — Code API
 
 Three agents, one goal — the framework handles the rest:
 
@@ -103,6 +132,15 @@ Tokens: 12847 output tokens
 ```
 
 ## Three Ways to Run
+
+**Via CLI (`oma`):**
+
+| Command | When to use |
+|---------|-------------|
+| `oma agent "<prompt>"` | Single agent, quick task, no config needed |
+| `oma run "<goal>"` | Full team, auto task decomposition |
+
+**Via code API:**
 
 | Mode | Method | When to use |
 |------|--------|-------------|
@@ -193,7 +231,8 @@ npx tsx examples/01-single-agent.ts
 |----------|--------|---------|--------|
 | Anthropic (Claude) | `provider: 'anthropic'` | `ANTHROPIC_API_KEY` | Verified |
 | OpenAI (GPT) | `provider: 'openai'` | `OPENAI_API_KEY` | Verified |
-| Grok (xAI)   | `provider: 'grok'` | `XAI_API_KEY` | Verified |
+| DeepSeek | `provider: 'openai'` + `baseURL: 'https://api.deepseek.com'` | `OPENAI_API_KEY` | Verified |
+| Grok (xAI) | `provider: 'grok'` | `XAI_API_KEY` | Verified |
 | GitHub Copilot | `provider: 'copilot'` | `GITHUB_TOKEN` | Verified |
 | Gemini | `provider: 'gemini'` | `GEMINI_API_KEY` | Verified |
 | Ollama / vLLM / LM Studio | `provider: 'openai'` + `baseURL` | — | Verified |
@@ -201,7 +240,7 @@ npx tsx examples/01-single-agent.ts
 
 Verified local models with tool-calling: **Gemma 4** (see [example 08](examples/08-gemma4-local.ts)).
 
-Any OpenAI-compatible API should work via `provider: 'openai'` + `baseURL` (DeepSeek, Groq, Mistral, Qwen, MiniMax, etc.). **Grok now has first-class support** via `provider: 'grok'`.
+Any OpenAI-compatible API works via `provider: 'openai'` + `baseURL` — DeepSeek, Groq, Mistral, Qwen, MiniMax, etc. **Grok** has first-class support via `provider: 'grok'`.
 
 ### Local Model Tool-Calling
 
@@ -241,7 +280,22 @@ const grokAgent: AgentConfig = {
 }
 ```
 
-(Set your `XAI_API_KEY` environment variable — no `baseURL` needed anymore.)
+(Set your `XAI_API_KEY` environment variable — no `baseURL` needed.)
+
+**DeepSeek** (OpenAI-compatible):
+
+```typescript
+const deepseekAgent: AgentConfig = {
+  name: 'deepseek-agent',
+  provider: 'openai',
+  baseURL: 'https://api.deepseek.com',
+  model: 'deepseek-chat',
+  apiKey: process.env.DEEPSEEK_API_KEY,
+  systemPrompt: 'You are a helpful assistant.',
+}
+```
+
+Or via CLI — set `DEEPSEEK_API_KEY` and run `oma init`, selecting `openai` as provider and entering the base URL when prompted.
 
 ## Contributing
 
