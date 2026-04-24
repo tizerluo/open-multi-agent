@@ -18,7 +18,8 @@ interface AgentOpts {
   tools?: string
   maxTurns?: string
   config?: string
-  noStream?: boolean
+  // Commander converts --no-stream to stream: false (not noStream)
+  stream?: boolean
 }
 
 export function registerAgentCommand(program: Command): void {
@@ -67,7 +68,8 @@ export function registerAgentCommand(program: Command): void {
       }
 
       // Use streaming unless --no-stream is set or stdout is not a TTY (e.g. piped)
-      const useStream = !opts.noStream && process.stdout.isTTY
+      // Commander sets opts.stream = false when --no-stream is passed
+      const useStream = opts.stream !== false && !!process.stdout.isTTY
 
       console.log()
 

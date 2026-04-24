@@ -7,7 +7,7 @@ import { Agent } from '../../src/agent/agent.js'
 import { ToolRegistry } from '../../src/tool/framework.js'
 import { ToolExecutor } from '../../src/tool/executor.js'
 import { registerBuiltInTools } from '../../src/tool/built-in/index.js'
-import type { AgentConfig, AgentRunResult } from '../../src/types.js'
+import type { AgentConfig } from '../../src/types.js'
 
 interface ChatOpts {
   model?: string
@@ -56,6 +56,7 @@ export function registerChatCommand(program: Command): void {
       let totalIn = 0
       let totalOut = 0
       let turns = 0
+      let exiting = false
 
       function printSummary(): void {
         console.log('\n' + chalk.dim('─'.repeat(60)))
@@ -64,7 +65,10 @@ export function registerChatCommand(program: Command): void {
         ))
       }
 
+      // Guard against SIGINT + close both firing (process.exit triggers stream close)
       process.on('SIGINT', () => {
+        if (exiting) return
+        exiting = true
         console.log()
         printSummary()
         process.exit(0)
@@ -85,6 +89,8 @@ export function registerChatCommand(program: Command): void {
       })
 
       rl.on('close', () => {
+        if (exiting) return
+        exiting = true
         printSummary()
         process.exit(0)
       })
@@ -106,19 +112,15 @@ export function registerChatCommand(program: Command): void {
           }
 
           if (trimmed.startsWith('/')) {
-            handleSlashCommand(trimmed, agent, rl, tools, printHelp)
-            ask()
+            const shouldContinue = handleSlashCommand(trimmed, agent, rl, tools, printHelp)
+            if (shouldContinue) ask()
             return
           }
 
           process.stdout.write(chalk.bold('Agent: '))
 
           try {
-            const result: AgentRunResult = await agent.prompt(trimmed)
-
-            // Print tool calls that happened during this turn (non-streaming)
-            const toolCallLines = extractToolSummary(result)
-            if (toolCallLines) process.stdout.write(chalk.dim(toolCallLines))
+            const result = await agent.prompt(trimmed)
 
             console.log(result.output || chalk.dim('(no output)'))
             console.log()
@@ -139,44 +141,37 @@ export function registerChatCommand(program: Command): void {
     })
 }
 
+// Returns true if the REPL should continue, false if it should stop.
 function handleSlashCommand(
   cmd: string,
   agent: Agent,
   rl: readline.Interface,
   tools: string[],
   printHelp: () => void,
-): void {
+): boolean {
   const lower = cmd.toLowerCase()
   switch (lower) {
     case '/clear':
       agent.reset()
       console.log(chalk.dim('Conversation cleared.'))
       console.log()
-      break
+      return true
     case '/exit':
     case '/quit':
       rl.close()
-      break
+      return false
     case '/tools':
       console.log(chalk.dim(`Tools: ${tools.join(', ')}`))
       console.log()
-      break
+      return true
     case '/help':
       printHelp()
       console.log()
-      break
+      return true
     default:
       console.log(chalk.yellow(`Unknown command: ${cmd}. Type /help for available commands.`))
       console.log()
+      return true
   }
 }
 
-function extractToolSummary(result: AgentRunResult): string {
-  // result.output is the final text; tool calls are in the conversation but not
-  // surfaced separately by AgentRunResult. We show a simple indicator when the
-  // agent used tools (detected by checking if output came after multi-turn work).
-  // For now, show nothing extra — tool calls are implicit in the response.
-  // A richer display requires hooking into onTrace, which is a Phase 3 concern.
-  void result
-  return ''
-}
