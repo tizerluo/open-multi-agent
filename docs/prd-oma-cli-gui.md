@@ -1,6 +1,6 @@
 # PRD：oma CLI + TUI
 
-> 状态：草稿 v0.1
+> 状态：草稿 v0.2
 > 最后更新：2026-04-24
 
 ---
@@ -67,11 +67,19 @@ open-multi-agent 是一个 TypeScript 多智能体编排框架，核心能力是
 - 保留完整对话历史，Agent 能引用之前的内容
 - 支持特殊指令：`/clear`（清空历史）、`/exit`（退出）、`/tools`（查看可用工具）
 - 可指定 Agent 角色：`oma chat --system "你是一个代码审查专家"`
+- 支持图片输入：`oma chat --image screenshot.png`（需使用视觉模型）
+
+**图片输入两种模式**：
+- **直接模式**：使用支持视觉的模型（Claude、GPT-4o、Gemini），图片和文字直接发给同一个模型处理，适合大多数场景
+- **专职模式**：团队中配置专门的 vision-agent 处理图片并输出文字描述写入 SharedMemory，其他 Agent 使用纯文本模型读取描述继续工作，成本更低
+
+默认使用直接模式；专职模式通过 agent 配置实现，不需要框架特殊支持。
 
 **验收标准**：
 - 多轮对话中 Agent 能正确引用前面的内容
 - `/clear` 后 Agent 不记得之前的对话
 - `Ctrl+C` 优雅退出，不报错
+- 传入图片时若模型不支持视觉，给出明确错误提示
 
 ---
 
@@ -164,6 +172,39 @@ oma config list                  # 列出所有 profile
 
 ---
 
+#### 4.2.7 执行历史 `oma history`
+
+**目标**：本地保存每次执行记录，支持回顾、复用、重跑。
+
+**存储**：每次执行结束后写入 `~/.oma/history/<timestamp>.json`，包含目标描述、模式（agent/run/chat）、使用的 agents、最终输出、token 消耗、执行时长。
+
+**用法**：
+```bash
+# 列出历史记录（最近 20 条）
+oma history
+  #5  2026-04-24 14:32  run   "开发一个命令行 todo 工具"    3 agents  2.1k tokens
+  #4  2026-04-24 11:15  agent "帮我 review src/index.ts"   1 agent   800 tokens
+  #3  2026-04-23 09:40  run   "写一份 TypeScript 技术方案"  2 agents  3.4k tokens
+
+# 查看某条记录的完整输出
+oma history show 5
+
+# 用相同目标和配置重新执行
+oma history rerun 5
+
+# 清空历史
+oma history clear
+```
+
+**验收标准**：
+- 每次 `oma agent` / `oma run` / `oma chat` 结束后自动写入历史
+- `oma history` 默认显示最近 20 条，`--limit` 参数可调整
+- `show` 显示完整输出内容及执行摘要（agents、tokens、耗时）
+- `rerun` 复用原始目标和配置，不复用结果
+- 历史文件纯 JSON，便于外部工具读取
+
+---
+
 ### 4.3 Ink TUI（终端可视化界面）
 
 命令入口：`oma tui`，或 `oma run --tui`。
@@ -239,6 +280,12 @@ oma config list                  # 列出所有 profile
 | `p` | 查看完整任务计划 |
 | `q` | 退出（运行中需二次确认） |
 
+#### 4.3.7 鼠标支持
+
+支持鼠标点击切换 Agent、点击展开/折叠工具调用卡片、滚动查看历史输出。
+
+**优先级**：低，列入 Phase 5。键盘导航优先实现，鼠标支持作为体验增强。
+
 ---
 
 ### 4.4 Agent 间通信可视化
@@ -266,9 +313,11 @@ developer/task:def:result
 
 在 Agent 详情视图中，可以切换到"对话历史"模式，查看该 Agent 与 LLM 的完整多轮对话（每一条 user / assistant 消息）。
 
-#### 4.4.4 MessageBus 消息流（可选）
+#### 4.4.4 MessageBus 消息流
 
-如果 Agent 之间有点对点消息，在时间线上显示消息发送方、接收方和内容摘要。
+MessageBus 是框架预留的 Agent 间点对点通信能力。当前 `runTeam` 模式下 Agent 主要通过 SharedMemory 传递结果，MessageBus 使用较少。
+
+**结论**：暂不做可视化，作为框架预留能力，待实际使用场景出现后再规划。
 
 ---
 
@@ -292,10 +341,11 @@ developer/task:def:result
 - `oma chat` 多轮对话
 - **验收**：能和 Agent 多轮对话，实时看到输出
 
-### Phase 2 — 计划确认 + 文件输入 + 结果保存
+### Phase 2 — 计划确认 + 文件输入 + 结果保存 + 历史记录
 - `oma run` 执行前显示计划并确认
 - `--file`、`--context`、`--output` 参数
-- **验收**：从 markdown 文件读取需求，执行前确认，结果保存到文件
+- `oma history` 历史记录查看和重跑
+- **验收**：从 markdown 文件读取需求，执行前确认，结果保存到文件，历史记录可查
 
 ### Phase 3 — Ink TUI 基础框架
 - Agent 树 + 流式输出面板
@@ -317,10 +367,12 @@ developer/task:def:result
 
 ---
 
-## 7. 待确认问题
+## 7. 决策记录
 
-- [ ] TUI 是否需要鼠标支持（点击切换 Agent），还是纯键盘？
-- [ ] `oma chat` 是否需要支持图片/文件输入（多模态）？
-- [ ] MessageBus 可视化优先级（Agent 间直接通信目前使用较少）
-- [ ] 是否需要 `oma history` 查看历史执行记录？
-- [ ] 是否考虑 Web UI 作为长期方向，TUI 作为过渡？
+| 问题 | 决策 |
+|------|------|
+| TUI 鼠标支持 | 要做，Phase 5，键盘优先 |
+| `oma chat` 图片输入 | 支持，默认直接模式（视觉模型），专职模式通过 agent 配置实现 |
+| MessageBus 可视化 | 暂不做，作为框架预留能力 |
+| `oma history` | 要做，列入 Phase 2 |
+| Web UI | 不做 |
