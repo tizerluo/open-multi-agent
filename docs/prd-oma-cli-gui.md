@@ -114,24 +114,31 @@ Proceed? [Y/n/e(dit)]
 
 **目标**：支持从文件或标准输入读取任务描述，融入工作流。
 
+**语义定义**：
+- **`--file <path>`**：从文件读取任务描述，作为 prompt 的来源。与位置参数 `<prompt>` 和管道输入三选一，不可同时使用。
+- **`--context <path>`**：附加上下文内容（不替代 prompt），可与任意 prompt 来源叠加，支持单文件或目录。
+
 **用法**：
 ```bash
-# 从文件读取目标
+# 从文件读取任务描述（替代位置参数）
 oma run --file task.md
+oma agent --file review-request.md
 
-# 管道输入
+# 管道输入（替代位置参数）
 cat requirements.txt | oma run
-echo "帮我 review 这段代码" | oma agent --file src/index.ts
+echo "帮我写单元测试" | oma agent
 
-# 附加上下文文件
+# 附加上下文文件（与任意 prompt 来源组合）
 oma agent "帮我优化这个函数" --context src/utils.ts
-oma run "根据这份需求开发功能" --file prd.md --context src/
+oma run --file task.md --context src/
+cat task.md | oma run --context src/
 ```
 
 **验收标准**：
-- `--file` 内容拼接到 prompt 开头
-- `--context` 支持单文件和目录（目录下所有文件内容附加）
-- 管道输入与 `--file` 互斥，同时使用报错提示
+- `--file`、管道输入、位置参数 `<prompt>` 三者互斥，同时使用时报错并提示正确用法
+- `--file` 文件不存在时给出清晰错误
+- `--context` 支持单文件和目录（目录递归读取所有文件内容）
+- `--context` 可与三种 prompt 来源中的任意一种叠加使用
 
 ---
 
