@@ -513,8 +513,8 @@ async function buildTaskPrompt(task: Task, team: Team): Promise<string> {
  */
 export class OpenMultiAgent {
   private readonly config: Required<
-    Omit<OrchestratorConfig, 'onApproval' | 'onProgress' | 'onTrace' | 'defaultBaseURL' | 'defaultApiKey'>
-  > & Pick<OrchestratorConfig, 'onApproval' | 'onProgress' | 'onTrace' | 'defaultBaseURL' | 'defaultApiKey'>
+    Omit<OrchestratorConfig, 'onApproval' | 'onPlanReady' | 'onProgress' | 'onTrace' | 'defaultBaseURL' | 'defaultApiKey'>
+  > & Pick<OrchestratorConfig, 'onApproval' | 'onPlanReady' | 'onProgress' | 'onTrace' | 'defaultBaseURL' | 'defaultApiKey'>
 
   private readonly teams: Map<string, Team> = new Map()
   private completedTaskCount = 0
@@ -535,6 +535,7 @@ export class OpenMultiAgent {
       defaultBaseURL: config.defaultBaseURL,
       defaultApiKey: config.defaultApiKey,
       onApproval: config.onApproval,
+      onPlanReady: config.onPlanReady,
       onProgress: config.onProgress,
       onTrace: config.onTrace,
     }
@@ -712,6 +713,18 @@ export class OpenMultiAgent {
       agentResults,
       config: this.config,
       runId,
+    }
+
+    if (this.config.onPlanReady) {
+      const tasks = queue.list()
+      const approved = await this.config.onPlanReady(tasks)
+      if (!approved) {
+        return {
+          success: false,
+          agentResults: new Map(),
+          totalTokenUsage: { input_tokens: 0, output_tokens: 0 },
+        }
+      }
     }
 
     await executeQueue(queue, ctx)

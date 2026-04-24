@@ -408,6 +408,12 @@ export interface OrchestratorConfig {
    * undefined behavior.
    */
   readonly onApproval?: (completedTasks: readonly Task[], nextTasks: readonly Task[]) => Promise<boolean>
+  /**
+   * Called after the coordinator decomposes the goal into tasks and before
+   * execution begins. Return true to proceed, false to abort.
+   * Only invoked by runTeam(). Not called for runAgent() or runTasks().
+   */
+  readonly onPlanReady?: (tasks: Task[]) => Promise<boolean>
 }
 
 // ---------------------------------------------------------------------------
