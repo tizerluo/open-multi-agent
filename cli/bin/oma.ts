@@ -5,6 +5,7 @@ import { registerInitCommand } from '../commands/init.js'
 import { registerRunCommand } from '../commands/run.js'
 import { registerAgentCommand } from '../commands/agent.js'
 import { registerConfigCommand } from '../commands/config.js'
+import { registerChatCommand } from '../commands/chat.js'
 
 const program = new Command()
   .name('oma')
@@ -15,6 +16,7 @@ registerInitCommand(program)
 registerRunCommand(program)
 registerAgentCommand(program)
 registerConfigCommand(program)
+registerChatCommand(program)
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(chalk.red('Fatal error:'), err instanceof Error ? err.message : String(err))

@@ -2,9 +2,14 @@ import { Command } from 'commander'
 import chalk from 'chalk'
 import { loadConfig, assertApiKey, type SupportedProvider } from '../lib/config-loader.js'
 import { createProgressRenderer } from '../lib/progress-renderer.js'
+import { renderStreamEvent } from '../lib/stream-renderer.js'
 import { exitWithError } from '../lib/error-handler.js'
 import { OpenMultiAgent } from '../../src/index.js'
-import type { AgentConfig } from '../../src/types.js'
+import { Agent } from '../../src/agent/agent.js'
+import { ToolRegistry } from '../../src/tool/framework.js'
+import { ToolExecutor } from '../../src/tool/executor.js'
+import { registerBuiltInTools } from '../../src/tool/built-in/index.js'
+import type { AgentConfig, AgentRunResult } from '../../src/types.js'
 
 interface AgentOpts {
   model?: string
@@ -13,6 +18,7 @@ interface AgentOpts {
   tools?: string
   maxTurns?: string
   config?: string
+  noStream?: boolean
 }
 
 export function registerAgentCommand(program: Command): void {
@@ -24,6 +30,7 @@ export function registerAgentCommand(program: Command): void {
     .option('-s, --system <systemPrompt>', 'System prompt')
     .option('--tools <tools>', 'Comma-separated tool names, e.g. bash,file_read')
     .option('--max-turns <n>', 'Maximum turns', '10')
+    .option('--no-stream', 'Disable streaming output (use spinner instead)')
     .option('--config <path>', 'Config file path')
     .action(async (prompt: string, opts: AgentOpts) => {
       const config = loadConfig(opts.config)
@@ -59,32 +66,81 @@ export function registerAgentCommand(program: Command): void {
         maxTurns,
       }
 
-      const renderer = createProgressRenderer()
-
-      const orchestrator = new OpenMultiAgent({
-        defaultModel: model,
-        defaultProvider: provider,
-        defaultApiKey: apiKey,
-        defaultBaseURL: baseURL,
-        onProgress: renderer.onProgress,
-      })
+      // Use streaming unless --no-stream is set or stdout is not a TTY (e.g. piped)
+      const useStream = !opts.noStream && process.stdout.isTTY
 
       console.log()
 
-      try {
-        const result = await orchestrator.runAgent(agentConfig, prompt)
-        renderer.finish()
-
-        console.log('\n' + chalk.bold('─'.repeat(60)))
-        console.log(result.output || chalk.dim('(no output)'))
-        console.log(chalk.dim(
-          `\nTokens: ${result.tokenUsage.input_tokens} in / ${result.tokenUsage.output_tokens} out`,
-        ))
-
-        if (!result.success) process.exit(1)
-      } catch (err) {
-        renderer.finish()
-        exitWithError(err instanceof Error ? err.message : String(err))
+      if (useStream) {
+        await runStreaming(agentConfig, prompt)
+      } else {
+        await runWithSpinner(agentConfig, prompt, { model, provider, apiKey, baseURL })
       }
     })
+}
+
+async function runStreaming(agentConfig: AgentConfig, prompt: string): Promise<void> {
+  const registry = new ToolRegistry()
+  registerBuiltInTools(registry)
+  const executor = new ToolExecutor(registry)
+  const agent = new Agent(agentConfig, registry, executor)
+
+  try {
+    let result: AgentRunResult | undefined
+
+    for await (const event of agent.stream(prompt)) {
+      if (event.type === 'done') {
+        result = event.data as AgentRunResult
+      } else if (event.type === 'error') {
+        const err = event.data instanceof Error ? event.data : new Error(String(event.data))
+        exitWithError(err.message)
+      } else {
+        renderStreamEvent(event)
+      }
+    }
+
+    process.stdout.write('\n')
+    console.log(chalk.dim('─'.repeat(60)))
+
+    if (result) {
+      console.log(chalk.dim(
+        `Tokens: ${result.tokenUsage.input_tokens} in / ${result.tokenUsage.output_tokens} out`,
+      ))
+      if (!result.success) process.exit(1)
+    }
+  } catch (err) {
+    exitWithError(err instanceof Error ? err.message : String(err))
+  }
+}
+
+async function runWithSpinner(
+  agentConfig: AgentConfig,
+  prompt: string,
+  opts: { model: string; provider: SupportedProvider; apiKey: string; baseURL?: string },
+): Promise<void> {
+  const renderer = createProgressRenderer()
+
+  const orchestrator = new OpenMultiAgent({
+    defaultModel: opts.model,
+    defaultProvider: opts.provider,
+    defaultApiKey: opts.apiKey,
+    defaultBaseURL: opts.baseURL,
+    onProgress: renderer.onProgress,
+  })
+
+  try {
+    const result = await orchestrator.runAgent(agentConfig, prompt)
+    renderer.finish()
+
+    console.log('\n' + chalk.bold('─'.repeat(60)))
+    console.log(result.output || chalk.dim('(no output)'))
+    console.log(chalk.dim(
+      `\nTokens: ${result.tokenUsage.input_tokens} in / ${result.tokenUsage.output_tokens} out`,
+    ))
+
+    if (!result.success) process.exit(1)
+  } catch (err) {
+    renderer.finish()
+    exitWithError(err instanceof Error ? err.message : String(err))
+  }
 }
