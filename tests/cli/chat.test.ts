@@ -18,6 +18,7 @@ vi.mock('../../cli/lib/config-loader.js', () => ({
   assertApiKey: vi.fn(() => 'sk-fake'),
 }))
 vi.mock('../../cli/lib/error-handler.js', () => ({ exitWithError: vi.fn() }))
+vi.mock('../../cli/lib/history.js', () => ({ writeHistory: vi.fn().mockResolvedValue(undefined) }))
 
 // ---------------------------------------------------------------------------
 // Helpers

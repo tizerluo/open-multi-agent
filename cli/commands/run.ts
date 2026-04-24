@@ -6,6 +6,7 @@ import { createProgressRenderer } from '../lib/progress-renderer.js'
 import { exitWithError } from '../lib/error-handler.js'
 import { saveOutput } from '../lib/output-saver.js'
 import { resolvePrompt } from '../lib/prompt-resolver.js'
+import { writeHistory } from '../lib/history.js'
 import { OpenMultiAgent } from '../../src/index.js'
 import type { AgentConfig, Task } from '../../src/types.js'
 
@@ -129,6 +130,8 @@ export function registerRunCommand(program: Command): void {
 
       console.log(chalk.bold(`\nGoal: ${chalk.cyan(resolvedGoal)}\n`))
 
+      const startTime = Date.now()
+
       try {
         const result = await orchestrator.runTeam(team, resolvedGoal)
         renderer.finish()
@@ -163,6 +166,19 @@ export function registerRunCommand(program: Command): void {
         if (opts.output) {
           await saveOutput(opts.output, finalOutput, opts.force ?? false)
         }
+
+        const durationMs = Date.now() - startTime
+        await writeHistory({
+          mode: 'run',
+          goal: resolvedGoal,
+          provider: config.provider,
+          model: config.model,
+          agents: agentConfigs.map(a => a.name),
+          output: finalOutput,
+          tokenUsage: result.totalTokenUsage,
+          durationMs,
+          success: result.success,
+        }).catch(() => {})
 
         if (!result.success) process.exit(1)
       } catch (err) {

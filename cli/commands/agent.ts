@@ -6,6 +6,7 @@ import { renderStreamEvent } from '../lib/stream-renderer.js'
 import { exitWithError } from '../lib/error-handler.js'
 import { saveOutput } from '../lib/output-saver.js'
 import { resolvePrompt } from '../lib/prompt-resolver.js'
+import { writeHistory } from '../lib/history.js'
 import { OpenMultiAgent } from '../../src/index.js'
 import { Agent } from '../../src/agent/agent.js'
 import { ToolRegistry } from '../../src/tool/framework.js'
@@ -85,7 +86,7 @@ export function registerAgentCommand(program: Command): void {
       console.log()
 
       if (useStream) {
-        await runStreaming(agentConfig, resolvedPrompt, { output: opts.output, force: opts.force })
+        await runStreaming(agentConfig, resolvedPrompt, { model, provider, output: opts.output, force: opts.force })
       } else {
         await runWithSpinner(agentConfig, resolvedPrompt, { model, provider, apiKey, baseURL, output: opts.output, force: opts.force })
       }
@@ -95,12 +96,14 @@ export function registerAgentCommand(program: Command): void {
 async function runStreaming(
   agentConfig: AgentConfig,
   prompt: string,
-  opts: { output?: string; force?: boolean },
+  opts: { model: string; provider: SupportedProvider; output?: string; force?: boolean },
 ): Promise<void> {
   const registry = new ToolRegistry()
   registerBuiltInTools(registry)
   const executor = new ToolExecutor(registry)
   const agent = new Agent(agentConfig, registry, executor)
+
+  const startTime = Date.now()
 
   try {
     let result: AgentRunResult | undefined
@@ -130,6 +133,18 @@ async function runStreaming(
       if (opts.output) {
         await saveOutput(opts.output, outputText, opts.force ?? false)
       }
+      const durationMs = Date.now() - startTime
+      await writeHistory({
+        mode: 'agent',
+        goal: prompt,
+        provider: opts.provider,
+        model: opts.model,
+        agents: [agentConfig.name ?? 'agent'],
+        output: outputText,
+        tokenUsage: result.tokenUsage ?? { input_tokens: 0, output_tokens: 0 },
+        durationMs,
+        success: true,
+      }).catch(() => {})
       if (!result.success) process.exit(1)
     }
   } catch (err) {
@@ -152,6 +167,8 @@ async function runWithSpinner(
     onProgress: renderer.onProgress,
   })
 
+  const startTime = Date.now()
+
   try {
     const result = await orchestrator.runAgent(agentConfig, prompt)
     renderer.finish()
@@ -165,6 +182,19 @@ async function runWithSpinner(
     if (opts.output) {
       await saveOutput(opts.output, result.output ?? '', opts.force ?? false)
     }
+
+    const durationMs = Date.now() - startTime
+    await writeHistory({
+      mode: 'agent',
+      goal: prompt,
+      provider: opts.provider,
+      model: opts.model,
+      agents: [agentConfig.name ?? 'agent'],
+      output: result.output ?? '',
+      tokenUsage: result.tokenUsage ?? { input_tokens: 0, output_tokens: 0 },
+      durationMs,
+      success: result.success,
+    }).catch(() => {})
 
     if (!result.success) process.exit(1)
   } catch (err) {
