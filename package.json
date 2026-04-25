@@ -1,6 +1,6 @@
 {
   "name": "@jackchen_me/open-multi-agent",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "TypeScript multi-agent framework — one runTeam() call from goal to result. Auto task decomposition, parallel execution. 3 dependencies, deploys anywhere Node.js runs.",
   "bin": {
     "oma": "./dist-cli/cli/bin/oma.js"
@@ -44,7 +44,7 @@
     "tool-use",
     "agent-framework"
   ],
-  "author": "",
+  "author": "JackChen",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"

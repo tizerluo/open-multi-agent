@@ -58,6 +58,20 @@ oma agent "Write a Python function that reverses a string and explain it"
 # Full team — describe a goal, the framework plans and runs it
 oma run "Build a command-line todo app in TypeScript and save it to /tmp/todo/"
 
+# Interactive TUI — dual-panel live view (agent tree + streaming output)
+oma tui "Build a command-line todo app in TypeScript and save it to /tmp/todo/"
+oma run "..." --tui          # same thing, as a flag on run
+
+# Interactive chat — multi-turn conversation with an agent
+oma chat
+
+# Read goal from a file, save output
+oma run --file goal.md --output result.md
+
+# History — view past runs, re-run them
+oma history
+oma history rerun <id>
+
 # Override model or provider on the fly
 oma agent "Summarise this for me" --provider openai --model deepseek-chat
 
@@ -66,6 +80,11 @@ oma config show
 ```
 
 Progress is shown in real time with spinners per agent, task status, and a token summary at the end.
+
+**TUI mode** (`oma tui` / `oma run --tui`) opens a full-terminal dual-panel interface:
+- Left panel — agent tree with live status icons (○ waiting · ● running · ✓ done · ✗ failed), navigate with ↑↓
+- Right panel — selected agent's streaming output and collapsible tool-call cards (toggle with Enter)
+- Bottom bar — task progress, token counts, `[q]uit`
 
 ### Option B — Code API
 
@@ -139,6 +158,12 @@ Tokens: 12847 output tokens
 |---------|-------------|
 | `oma agent "<prompt>"` | Single agent, quick task, no config needed |
 | `oma run "<goal>"` | Full team, auto task decomposition |
+| `oma run "<goal>" --tui` | Same as above but with interactive TUI |
+| `oma tui "<goal>"` | Interactive TUI (alias for `oma run --tui`) |
+| `oma chat` | Multi-turn conversation with an agent |
+| `oma history` | Browse past runs, re-run or inspect output |
+| `oma config show` | Display current provider, model, and agents |
+| `oma init` | Interactive first-time setup |
 
 **Via code API:**
 
