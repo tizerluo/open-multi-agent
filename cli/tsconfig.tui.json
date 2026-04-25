@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.cli.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react"
+  },
+  "include": [
+    "../cli/**/*",
+    "../src/**/*"
+  ],
+  "exclude": [
+    "../node_modules",
+    "../tests",
+    "../examples"
+  ]
+}

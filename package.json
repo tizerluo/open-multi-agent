@@ -23,7 +23,8 @@
   "scripts": {
     "build": "tsc",
     "build:cli": "tsc -p cli/tsconfig.cli.json",
-    "build:all": "npm run build && npm run build:cli",
+    "build:tui": "tsc -p cli/tsconfig.tui.json",
+    "build:all": "npm run build && npm run build:cli && npm run build:tui",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -52,9 +53,11 @@
     "@anthropic-ai/sdk": "^0.52.0",
     "chalk": "^5.6.2",
     "commander": "^13.1.0",
+    "ink": "^4.4.1",
     "inquirer": "^12.11.1",
     "openai": "^4.73.0",
     "ora": "^8.2.0",
+    "react": "^18.3.1",
     "zod": "^3.23.0"
   },
   "peerDependencies": {
@@ -68,6 +71,7 @@
   "devDependencies": {
     "@google/genai": "^1.48.0",
     "@types/node": "^22.0.0",
+    "@types/react": "^18.3.28",
     "@vitest/coverage-v8": "^2.1.9",
     "tsx": "^4.21.0",
     "typescript": "^5.6.0",

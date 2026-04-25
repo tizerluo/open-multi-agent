@@ -7,6 +7,7 @@ import { registerAgentCommand } from '../commands/agent.js'
 import { registerConfigCommand } from '../commands/config.js'
 import { registerChatCommand } from '../commands/chat.js'
 import { registerHistoryCommand } from '../commands/history.js'
+import { registerTuiCommand } from '../commands/tui.js'
 
 const program = new Command()
   .name('oma')
@@ -19,6 +20,7 @@ registerAgentCommand(program)
 registerConfigCommand(program)
 registerChatCommand(program)
 registerHistoryCommand(program)
+registerTuiCommand(program)
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(chalk.red('Fatal error:'), err instanceof Error ? err.message : String(err))
