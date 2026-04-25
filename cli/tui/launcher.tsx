@@ -39,7 +39,11 @@ export async function launchTui(opts: TuiLaunchOpts): Promise<void> {
 
   orchestrator.runTeam(team, goal)
     .then(async (result) => {
-      dispatch({ type: 'DONE' })
+      if (result.success) {
+        dispatch({ type: 'DONE' })
+      } else {
+        dispatch({ type: 'ERROR', message: 'One or more tasks failed' })
+      }
       const coordinatorResult = result.agentResults.get('coordinator')
       const finalOutput = coordinatorResult?.output ?? ''
       await writeHistory({

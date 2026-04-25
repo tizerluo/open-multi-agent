@@ -136,7 +136,7 @@ export class AgentPool {
     try {
       if (streamCallback) {
         let result: AgentRunResult | null = null
-        for await (const event of agent.stream(prompt)) {
+        for await (const event of agent.stream(prompt, runOptions)) {
           streamCallback(event)
           if (event.type === 'done') result = event.data as AgentRunResult
           if (event.type === 'error') throw event.data as Error

@@ -9,8 +9,8 @@ interface ProgressBarProps {
 }
 
 export function ProgressBar({ done, total, tokenIn, tokenOut }: ProgressBarProps): React.ReactElement {
-  const ratio = total > 0 ? done / total : 0
-  const filled = Math.floor(ratio * 10)
+  const ratio = total > 0 ? Math.min(done / total, 1) : 0
+  const filled = Math.min(Math.max(Math.floor(ratio * 10), 0), 10)
   const bar = '█'.repeat(filled) + '░'.repeat(10 - filled)
   const pct = Math.floor(ratio * 100)
 
