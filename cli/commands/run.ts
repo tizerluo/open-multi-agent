@@ -13,6 +13,7 @@ import type { AgentConfig, Task } from '../../src/types.js'
 interface RunOpts {
   config?: string
   yes?: boolean
+  tui?: boolean
   output?: string
   force?: boolean
   file?: string
@@ -62,6 +63,7 @@ export function registerRunCommand(program: Command): void {
     .description('Run a multi-agent team to achieve the goal (auto task decomposition)')
     .option('--config <path>', 'Config file path')
     .option('-y, --yes', 'skip confirmation, proceed directly')
+    .option('--tui', 'Launch interactive TUI while running')
     .option('--output <path>', 'Save output to file')
     .option('--force', 'Overwrite output file without prompting')
     .option('--file <path>', 'Read goal from file')
@@ -95,6 +97,26 @@ export function registerRunCommand(program: Command): void {
               maxTurns: 10,
             },
           ]
+
+      // TUI branch — dynamically loaded to keep JSX out of CLI compilation
+      if (opts.tui) {
+        type LaunchTuiFn = (opts: {
+          goal: string; agentConfigs: AgentConfig[]; provider: string
+          model: string; apiKey: string; baseURL?: string; startTime: number
+        }) => Promise<void>
+        // @ts-ignore launcher.tsx compiled separately by TUI tsconfig (jsx: react-jsx)
+        const { launchTui } = await import('../tui/launcher.js') as { launchTui: LaunchTuiFn }
+        await launchTui({
+          goal: resolvedGoal,
+          agentConfigs,
+          provider: config.provider,
+          model: config.model,
+          apiKey,
+          baseURL: config.baseURL,
+          startTime: Date.now(),
+        })
+        return
+      }
 
       const renderer = createProgressRenderer()
 
