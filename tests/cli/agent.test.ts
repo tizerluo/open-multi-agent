@@ -15,6 +15,11 @@ vi.mock('../../cli/lib/config-loader.js', () => ({
   loadConfig: vi.fn(() => ({ provider: 'anthropic', model: 'claude-haiku-4-5-20251001' })),
   assertApiKey: vi.fn(() => 'sk-fake'),
 }))
+vi.mock('../../cli/lib/prompt-resolver.js', () => ({
+  resolvePrompt: vi.fn(async (opts: { positional?: string; file?: string; context?: string }) =>
+    opts.positional ?? opts.file ?? 'resolved-prompt',
+  ),
+}))
 vi.mock('../../cli/lib/error-handler.js', () => ({ exitWithError: vi.fn() }))
 vi.mock('../../cli/lib/stream-renderer.js', () => ({ renderStreamEvent: vi.fn() }))
 vi.mock('../../cli/lib/progress-renderer.js', () => ({

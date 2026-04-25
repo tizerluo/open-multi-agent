@@ -4,6 +4,9 @@ import { loadConfig, assertApiKey, type SupportedProvider } from '../lib/config-
 import { createProgressRenderer } from '../lib/progress-renderer.js'
 import { renderStreamEvent } from '../lib/stream-renderer.js'
 import { exitWithError } from '../lib/error-handler.js'
+import { saveOutput } from '../lib/output-saver.js'
+import { resolvePrompt } from '../lib/prompt-resolver.js'
+import { writeHistory } from '../lib/history.js'
 import { OpenMultiAgent } from '../../src/index.js'
 import { Agent } from '../../src/agent/agent.js'
 import { ToolRegistry } from '../../src/tool/framework.js'
@@ -20,11 +23,15 @@ interface AgentOpts {
   config?: string
   // Commander converts --no-stream to stream: false (not noStream)
   stream?: boolean
+  output?: string
+  force?: boolean
+  file?: string
+  context?: string
 }
 
 export function registerAgentCommand(program: Command): void {
   program
-    .command('agent <prompt>')
+    .command('agent [prompt]')
     .description('Run a single agent with the given prompt')
     .option('-m, --model <model>', 'Model name (overrides config)')
     .option('-p, --provider <provider>', 'Provider: anthropic|openai|gemini|grok|copilot')
@@ -33,7 +40,12 @@ export function registerAgentCommand(program: Command): void {
     .option('--max-turns <n>', 'Maximum turns', '10')
     .option('--no-stream', 'Disable streaming output (use spinner instead)')
     .option('--config <path>', 'Config file path')
-    .action(async (prompt: string, opts: AgentOpts) => {
+    .option('--output <path>', 'Save output to file')
+    .option('--force', 'Overwrite output file without prompting')
+    .option('--file <path>', 'Read prompt from file')
+    .option('--context <path>', 'Append file or directory contents as context')
+    .action(async (prompt: string | undefined, opts: AgentOpts) => {
+      const resolvedPrompt = await resolvePrompt({ positional: prompt, file: opts.file, context: opts.context })
       const config = loadConfig(opts.config)
       const provider = (opts.provider ?? config.provider) as SupportedProvider
       const model = opts.model ?? config.model
@@ -74,21 +86,28 @@ export function registerAgentCommand(program: Command): void {
       console.log()
 
       if (useStream) {
-        await runStreaming(agentConfig, prompt)
+        await runStreaming(agentConfig, resolvedPrompt, { model, provider, output: opts.output, force: opts.force })
       } else {
-        await runWithSpinner(agentConfig, prompt, { model, provider, apiKey, baseURL })
+        await runWithSpinner(agentConfig, resolvedPrompt, { model, provider, apiKey, baseURL, output: opts.output, force: opts.force })
       }
     })
 }
 
-async function runStreaming(agentConfig: AgentConfig, prompt: string): Promise<void> {
+async function runStreaming(
+  agentConfig: AgentConfig,
+  prompt: string,
+  opts: { model: string; provider: SupportedProvider; output?: string; force?: boolean },
+): Promise<void> {
   const registry = new ToolRegistry()
   registerBuiltInTools(registry)
   const executor = new ToolExecutor(registry)
   const agent = new Agent(agentConfig, registry, executor)
 
+  const startTime = Date.now()
+
   try {
     let result: AgentRunResult | undefined
+    let outputText = ''
 
     for await (const event of agent.stream(prompt)) {
       if (event.type === 'done') {
@@ -97,6 +116,9 @@ async function runStreaming(agentConfig: AgentConfig, prompt: string): Promise<v
         const err = event.data instanceof Error ? event.data : new Error(String(event.data))
         exitWithError(err.message)
       } else {
+        if (event.type === 'text') {
+          outputText += event.data
+        }
         renderStreamEvent(event)
       }
     }
@@ -108,6 +130,21 @@ async function runStreaming(agentConfig: AgentConfig, prompt: string): Promise<v
       console.log(chalk.dim(
         `Tokens: ${result.tokenUsage.input_tokens} in / ${result.tokenUsage.output_tokens} out`,
       ))
+      if (opts.output) {
+        await saveOutput(opts.output, outputText, opts.force ?? false)
+      }
+      const durationMs = Date.now() - startTime
+      await writeHistory({
+        mode: 'agent',
+        goal: prompt,
+        provider: opts.provider,
+        model: opts.model,
+        agents: [agentConfig.name ?? 'agent'],
+        output: outputText,
+        tokenUsage: result.tokenUsage ?? { input_tokens: 0, output_tokens: 0 },
+        durationMs,
+        success: result.success,
+      }).catch(() => {})
       if (!result.success) process.exit(1)
     }
   } catch (err) {
@@ -118,7 +155,7 @@ async function runStreaming(agentConfig: AgentConfig, prompt: string): Promise<v
 async function runWithSpinner(
   agentConfig: AgentConfig,
   prompt: string,
-  opts: { model: string; provider: SupportedProvider; apiKey: string; baseURL?: string },
+  opts: { model: string; provider: SupportedProvider; apiKey: string; baseURL?: string; output?: string; force?: boolean },
 ): Promise<void> {
   const renderer = createProgressRenderer()
 
@@ -130,6 +167,8 @@ async function runWithSpinner(
     onProgress: renderer.onProgress,
   })
 
+  const startTime = Date.now()
+
   try {
     const result = await orchestrator.runAgent(agentConfig, prompt)
     renderer.finish()
@@ -139,6 +178,23 @@ async function runWithSpinner(
     console.log(chalk.dim(
       `\nTokens: ${result.tokenUsage.input_tokens} in / ${result.tokenUsage.output_tokens} out`,
     ))
+
+    if (opts.output) {
+      await saveOutput(opts.output, result.output ?? '', opts.force ?? false)
+    }
+
+    const durationMs = Date.now() - startTime
+    await writeHistory({
+      mode: 'agent',
+      goal: prompt,
+      provider: opts.provider,
+      model: opts.model,
+      agents: [agentConfig.name ?? 'agent'],
+      output: result.output ?? '',
+      tokenUsage: result.tokenUsage ?? { input_tokens: 0, output_tokens: 0 },
+      durationMs,
+      success: result.success,
+    }).catch(() => {})
 
     if (!result.success) process.exit(1)
   } catch (err) {

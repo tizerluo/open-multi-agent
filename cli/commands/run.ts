@@ -1,21 +1,73 @@
 import { Command } from 'commander'
 import chalk from 'chalk'
+import readline from 'node:readline'
 import { loadConfig, assertApiKey } from '../lib/config-loader.js'
 import { createProgressRenderer } from '../lib/progress-renderer.js'
 import { exitWithError } from '../lib/error-handler.js'
+import { saveOutput } from '../lib/output-saver.js'
+import { resolvePrompt } from '../lib/prompt-resolver.js'
+import { writeHistory } from '../lib/history.js'
 import { OpenMultiAgent } from '../../src/index.js'
-import type { AgentConfig } from '../../src/types.js'
+import type { AgentConfig, Task } from '../../src/types.js'
 
 interface RunOpts {
   config?: string
+  yes?: boolean
+  output?: string
+  force?: boolean
+  file?: string
+  context?: string
+}
+
+function displayPlan(goal: string, tasks: Task[]): void {
+  console.log(`Goal: ${goal}`)
+  console.log('')
+  console.log('Proposed plan:')
+  for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i]
+    const assignee = task.assignee ?? '?'
+    const depNums = (task.dependsOn ?? []).map(depId => tasks.findIndex(t => t.id === depId) + 1)
+    const depPart = depNums.length > 0 ? `  (depends on: ${depNums.join(', ')})` : ''
+    console.log(`  ${i + 1}. [${assignee}]  ${task.title}${depPart}`)
+  }
+}
+
+async function confirmPlan(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+    const ask = (): void => {
+      rl.question('Proceed? [Y/n] ', (answer) => {
+        const trimmed = answer.trim().toLowerCase()
+        if (trimmed === '' || trimmed === 'y') {
+          rl.close()
+          resolve(true)
+        } else if (trimmed === 'n') {
+          rl.close()
+          resolve(false)
+        } else if (trimmed === 'e') {
+          console.log('Edit mode not yet available, use Y or n')
+          ask()
+        } else {
+          ask()
+        }
+      })
+    }
+    ask()
+  })
 }
 
 export function registerRunCommand(program: Command): void {
   program
-    .command('run <goal>')
+    .command('run [goal]')
     .description('Run a multi-agent team to achieve the goal (auto task decomposition)')
     .option('--config <path>', 'Config file path')
-    .action(async (goal: string, opts: RunOpts) => {
+    .option('-y, --yes', 'skip confirmation, proceed directly')
+    .option('--output <path>', 'Save output to file')
+    .option('--force', 'Overwrite output file without prompting')
+    .option('--file <path>', 'Read goal from file')
+    .option('--context <path>', 'Append file or directory contents as context')
+    .action(async (goal: string | undefined, opts: RunOpts) => {
+      const resolvedGoal = await resolvePrompt({ positional: goal, file: opts.file, context: opts.context })
       const config = loadConfig(opts.config)
       const apiKey = assertApiKey(config)
 
@@ -46,12 +98,27 @@ export function registerRunCommand(program: Command): void {
 
       const renderer = createProgressRenderer()
 
+      const shouldConfirm = !opts.yes && !!process.stdin.isTTY
+
+      let planApproved = true
+
       const orchestrator = new OpenMultiAgent({
         defaultModel: config.model,
         defaultProvider: config.provider,
         defaultApiKey: apiKey,
         defaultBaseURL: config.baseURL,
         onProgress: renderer.onProgress,
+        onPlanReady: shouldConfirm
+          ? async (tasks) => {
+              displayPlan(resolvedGoal, tasks)
+              const approved = await confirmPlan()
+              if (!approved) {
+                planApproved = false
+                console.log('Cancelled.')
+              }
+              return approved
+            }
+          : undefined,
       })
 
       const team = orchestrator.createTeam('oma-team', {
@@ -61,11 +128,17 @@ export function registerRunCommand(program: Command): void {
         maxConcurrency: config.team.maxConcurrency,
       })
 
-      console.log(chalk.bold(`\nGoal: ${chalk.cyan(goal)}\n`))
+      console.log(chalk.bold(`\nGoal: ${chalk.cyan(resolvedGoal)}\n`))
+
+      const startTime = Date.now()
 
       try {
-        const result = await orchestrator.runTeam(team, goal)
+        const result = await orchestrator.runTeam(team, resolvedGoal)
         renderer.finish()
+
+        if (!planApproved) {
+          process.exit(0)
+        }
 
         // Find the final synthesized output: coordinator agent, or last successful agent
         let finalOutput = ''
@@ -89,6 +162,23 @@ export function registerRunCommand(program: Command): void {
         console.log(chalk.dim(
           `\nTokens: ${result.totalTokenUsage.input_tokens} in / ${result.totalTokenUsage.output_tokens} out`,
         ))
+
+        if (opts.output) {
+          await saveOutput(opts.output, finalOutput, opts.force ?? false)
+        }
+
+        const durationMs = Date.now() - startTime
+        await writeHistory({
+          mode: 'run',
+          goal: resolvedGoal,
+          provider: config.provider,
+          model: config.model,
+          agents: agentConfigs.map(a => a.name),
+          output: finalOutput,
+          tokenUsage: result.totalTokenUsage,
+          durationMs,
+          success: result.success,
+        }).catch(() => {})
 
         if (!result.success) process.exit(1)
       } catch (err) {

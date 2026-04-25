@@ -3,6 +3,7 @@ import chalk from 'chalk'
 import readline from 'node:readline'
 import { loadConfig, assertApiKey, type SupportedProvider } from '../lib/config-loader.js'
 import { exitWithError } from '../lib/error-handler.js'
+import { writeHistory } from '../lib/history.js'
 import { Agent } from '../../src/agent/agent.js'
 import { ToolRegistry } from '../../src/tool/framework.js'
 import { ToolExecutor } from '../../src/tool/executor.js'
@@ -57,6 +58,9 @@ export function registerChatCommand(program: Command): void {
       let totalOut = 0
       let turns = 0
       let exiting = false
+      const startTime = Date.now()
+      let firstMessage = ''
+      let lastOutput = ''
 
       function printSummary(): void {
         console.log('\n' + chalk.dim('─'.repeat(60)))
@@ -71,7 +75,21 @@ export function registerChatCommand(program: Command): void {
         exiting = true
         console.log()
         printSummary()
-        process.exit(0)
+        if (turns > 0) {
+          writeHistory({
+            mode: 'chat',
+            goal: firstMessage.slice(0, 100),
+            provider,
+            model,
+            agents: ['chat'],
+            output: lastOutput,
+            tokenUsage: { input_tokens: totalIn, output_tokens: totalOut },
+            durationMs: Date.now() - startTime,
+            success: true,
+          }).catch(() => {}).finally(() => process.exit(0))
+        } else {
+          process.exit(0)
+        }
       })
 
       // Welcome banner
@@ -92,7 +110,21 @@ export function registerChatCommand(program: Command): void {
         if (exiting) return
         exiting = true
         printSummary()
-        process.exit(0)
+        if (turns > 0) {
+          writeHistory({
+            mode: 'chat',
+            goal: firstMessage.slice(0, 100),
+            provider,
+            model,
+            agents: ['chat'],
+            output: lastOutput,
+            tokenUsage: { input_tokens: totalIn, output_tokens: totalOut },
+            durationMs: Date.now() - startTime,
+            success: true,
+          }).catch(() => {}).finally(() => process.exit(0))
+        } else {
+          process.exit(0)
+        }
       })
 
       function printHelp(): void {
@@ -117,6 +149,10 @@ export function registerChatCommand(program: Command): void {
             return
           }
 
+          if (turns === 0) {
+            firstMessage = trimmed
+          }
+
           process.stdout.write(chalk.bold('Agent: '))
 
           try {
@@ -127,6 +163,7 @@ export function registerChatCommand(program: Command): void {
 
             totalIn += result.tokenUsage.input_tokens
             totalOut += result.tokenUsage.output_tokens
+            lastOutput = result.output ?? ''
             turns++
           } catch (err) {
             console.log(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`))
