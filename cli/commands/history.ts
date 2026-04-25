@@ -106,7 +106,7 @@ export function registerHistoryCommand(program: Command): void {
         console.log(`Rerunning: ${entry.goal}`)
 
         const args = entry.mode === 'run'
-          ? ['run', entry.goal, '--yes', '--provider', entry.provider, '--model', entry.model]
+          ? ['run', entry.goal, '--yes']
           : ['agent', entry.goal, '--provider', entry.provider, '--model', entry.model]
 
         execFileSync(process.argv[0], [process.argv[1], ...args], { stdio: 'inherit' })

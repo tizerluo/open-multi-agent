@@ -143,7 +143,7 @@ async function runStreaming(
         output: outputText,
         tokenUsage: result.tokenUsage ?? { input_tokens: 0, output_tokens: 0 },
         durationMs,
-        success: true,
+        success: result.success,
       }).catch(() => {})
       if (!result.success) process.exit(1)
     }
