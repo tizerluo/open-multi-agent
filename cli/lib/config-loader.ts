@@ -76,12 +76,20 @@ function findProjectConfig(): string | null {
 // Read / write
 // ---------------------------------------------------------------------------
 
-function readJsonFile(filePath: string): Partial<OmaConfig> {
+function readJsonFile(filePath: string, required = false): Partial<OmaConfig> {
   let raw: string
   try {
     raw = fs.readFileSync(filePath, 'utf8')
   } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {}
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (required) {
+        exitWithError(
+          `Config file not found: ${filePath}`,
+          'Check the path and try again.',
+        )
+      }
+      return {}
+    }
     throw err
   }
   try {
@@ -113,7 +121,8 @@ export function loadConfig(overridePath?: string): OmaConfig {
   const global = readJsonFile(globalConfigPath())
 
   const projectPath = overridePath ?? findProjectConfig()
-  const project = projectPath ? readJsonFile(projectPath) : {}
+  // Explicitly passed --config path must exist; auto-discovered paths may not.
+  const project = projectPath ? readJsonFile(projectPath, overridePath != null) : {}
 
   // Deep merge: project overrides global, both override defaults
   const merged: OmaConfig = {

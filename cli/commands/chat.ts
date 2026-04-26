@@ -31,7 +31,9 @@ export function registerChatCommand(program: Command): void {
       const config = loadConfig(opts.config)
       const provider = (opts.provider ?? config.provider) as SupportedProvider
       const model = opts.model ?? config.model
-      const baseURL = opts.provider == null ? config.baseURL : undefined
+      const baseURL = (opts.provider == null || opts.provider === config.provider)
+        ? config.baseURL
+        : undefined
       const apiKey = assertApiKey({ ...config, provider })
 
       const tools = opts.tools
@@ -44,7 +46,7 @@ export function registerChatCommand(program: Command): void {
         provider,
         apiKey,
         baseURL,
-        systemPrompt: opts.system ?? 'You are a helpful assistant.',
+        systemPrompt: opts.system ?? config.team?.agents?.[0]?.systemPrompt ?? 'You are a helpful assistant.',
         tools,
         maxTurns: 20,
       }
