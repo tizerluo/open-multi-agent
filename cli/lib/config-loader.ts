@@ -77,11 +77,20 @@ function findProjectConfig(): string | null {
 // ---------------------------------------------------------------------------
 
 function readJsonFile(filePath: string): Partial<OmaConfig> {
+  let raw: string
   try {
-    const raw = fs.readFileSync(filePath, 'utf8')
+    raw = fs.readFileSync(filePath, 'utf8')
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {}
+    throw err
+  }
+  try {
     return JSON.parse(raw) as Partial<OmaConfig>
   } catch {
-    return {}
+    exitWithError(
+      `Invalid JSON in config file: ${filePath}`,
+      'Fix the syntax error or delete the file and run `oma init`.',
+    )
   }
 }
 
@@ -130,7 +139,7 @@ export function getEffectiveApiKey(config: OmaConfig): string | undefined {
   return process.env[envVar] ?? config.apiKey
 }
 
-export function assertApiKey(config: OmaConfig): string {
+export function assertApiKey(config: OmaConfig): string | undefined {
   const key = getEffectiveApiKey(config)
   if (!key && config.provider !== 'copilot') {
     const envVar = PROVIDER_ENV_VARS[config.provider]
@@ -139,7 +148,7 @@ export function assertApiKey(config: OmaConfig): string {
       `Set the ${envVar} environment variable, or run \`oma init\` to save a key.`,
     )
   }
-  return key ?? ''
+  return key
 }
 
 // ---------------------------------------------------------------------------

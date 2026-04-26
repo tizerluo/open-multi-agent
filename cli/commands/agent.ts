@@ -49,9 +49,11 @@ export function registerAgentCommand(program: Command): void {
       const config = loadConfig(opts.config)
       const provider = (opts.provider ?? config.provider) as SupportedProvider
       const model = opts.model ?? config.model
-      // Only carry baseURL from config when the provider hasn't been overridden;
-      // otherwise a saved DeepSeek baseURL would be sent to Grok/Anthropic etc.
-      const baseURL = opts.provider == null ? config.baseURL : undefined
+      // Carry baseURL from config unless --provider switches to a different provider;
+      // switching providers (e.g. openai→anthropic) invalidates a custom endpoint.
+      const baseURL = (opts.provider == null || opts.provider === config.provider)
+        ? config.baseURL
+        : undefined
 
       // Temporarily override provider for key lookup
       const apiKey = assertApiKey({ ...config, provider })
@@ -155,7 +157,7 @@ async function runStreaming(
 async function runWithSpinner(
   agentConfig: AgentConfig,
   prompt: string,
-  opts: { model: string; provider: SupportedProvider; apiKey: string; baseURL?: string; output?: string; force?: boolean },
+  opts: { model: string; provider: SupportedProvider; apiKey?: string; baseURL?: string; output?: string; force?: boolean },
 ): Promise<void> {
   const renderer = createProgressRenderer()
 
