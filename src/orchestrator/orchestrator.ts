@@ -814,8 +814,8 @@ async function buildTaskPrompt(task: Task, team: Team, queue: TaskQueue): Promis
  */
 export class OpenMultiAgent {
   private readonly config: Required<
-    Omit<OrchestratorConfig, 'onApproval' | 'onProgress' | 'onTrace' | 'defaultBaseURL' | 'defaultApiKey' | 'maxTokenBudget'>
-  > & Pick<OrchestratorConfig, 'onApproval' | 'onProgress' | 'onTrace' | 'defaultBaseURL' | 'defaultApiKey' | 'maxTokenBudget'>
+    Omit<OrchestratorConfig, 'onApproval' | 'onPlanReady' | 'onProgress' | 'onTrace' | 'defaultBaseURL' | 'defaultApiKey' | 'maxTokenBudget'>
+  > & Pick<OrchestratorConfig, 'onApproval' | 'onPlanReady' | 'onProgress' | 'onTrace' | 'defaultBaseURL' | 'defaultApiKey' | 'maxTokenBudget'>
 
   private readonly teams: Map<string, Team> = new Map()
   private completedTaskCount = 0
@@ -839,6 +839,7 @@ export class OpenMultiAgent {
       defaultApiKey: config.defaultApiKey,
       maxTokenBudget: config.maxTokenBudget,
       onApproval: config.onApproval,
+      onPlanReady: config.onPlanReady,
       onProgress: config.onProgress,
       onTrace: config.onTrace,
     }
@@ -1173,6 +1174,18 @@ export class OpenMultiAgent {
       budgetExceededTriggered: false,
       budgetExceededReason: undefined,
       taskMetrics,
+    }
+
+    if (this.config.onPlanReady) {
+      const tasks = queue.list()
+      const approved = await this.config.onPlanReady(tasks)
+      if (!approved) {
+        return {
+          success: false,
+          agentResults: new Map(),
+          totalTokenUsage: { input_tokens: 0, output_tokens: 0 },
+        }
+      }
     }
 
     await executeQueue(queue, ctx)
